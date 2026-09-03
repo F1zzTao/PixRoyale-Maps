@@ -1,0 +1,10 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: bot:latest
+    container_name: ${COMPOSE_PROJECT_NAME}-bot
+    restart: always
+    env_file:
+      - .env
