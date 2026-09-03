@@ -149,8 +149,11 @@ def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
     return np.clip(result, 0, 255)
 
 
-def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int = HEIGHT) -> Image.Image:
+def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int = HEIGHT, is_canvas: bool = False) -> Image.Image:
     MAIN_WIDTH = 2714
+    if is_canvas:
+        MAIN_WIDTH = 1357
+
     VIP_WIDTH = 340
 
     main_size = MAIN_WIDTH * HEIGHT * CHANNELS
@@ -234,7 +237,7 @@ def render_region_map(terrain: np.ndarray, snapshot_bytes: bytes, region_key: st
 
 def render_canvas_map(snapshot_bytes: bytes) -> bytes:
     """Рендеринг чистого холста без подложки реалистичной карты"""
-    canvas_image = create_player_layer(snapshot_bytes, CANVAS_WIDTH, CANVAS_HEIGHT)
+    canvas_image = create_player_layer(snapshot_bytes, CANVAS_WIDTH, CANVAS_HEIGHT, is_canvas=True)
 
     resized_image = canvas_image.resize(
         (CANVAS_WIDTH * SCALE_FACTOR, CANVAS_HEIGHT * SCALE_FACTOR),
