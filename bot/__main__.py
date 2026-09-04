@@ -1,6 +1,5 @@
 import asyncio
 import io
-import logging
 import os
 
 import aiohttp
@@ -19,6 +18,7 @@ from aiogram.types import (
     Message,
 )
 from dotenv import load_dotenv
+from loguru import logger
 from PIL import Image
 
 load_dotenv()
@@ -32,7 +32,7 @@ HEIGHT = 1256
 CHANNELS = 4
 
 # Размеры холста
-CANVAS_WIDTH = 1701      # 1357 + 4 + 340
+CANVAS_WIDTH = 1701  # 1357 + 4 + 340
 CANVAS_HEIGHT = 628
 
 SNAPSHOT_URL = "https://pr.altarus.top/world/snapshot"
@@ -95,14 +95,14 @@ REGION_NAMES = {
 
 router = Router()
 
+
 # ============================================================
 # КНОПКА ИГРЫ
 # ============================================================
 def get_play_button():
     """Кнопка для запуска игры"""
     button = InlineKeyboardButton(
-        text="🎮 Играть в PixRoyale",
-        url="https://t.me/PixRoyaleBot?startapp"
+        text="🎮 Играть в PixRoyale", url="https://t.me/PixRoyaleBot?startapp"
     )
     return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
@@ -129,9 +129,7 @@ async def load_terrain(session: aiohttp.ClientSession) -> np.ndarray:
 # ============================================================
 def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
     brightness = (
-        0.299 * terrain[:, :, 0]
-        + 0.587 * terrain[:, :, 1]
-        + 0.114 * terrain[:, :, 2]
+        0.299 * terrain[:, :, 0] + 0.587 * terrain[:, :, 1] + 0.114 * terrain[:, :, 2]
     )
     gradient_y, gradient_x = np.gradient(brightness)
     relief_strength = np.sqrt(gradient_x**2 + gradient_y**2)
@@ -145,11 +143,18 @@ def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
     light_alpha = light * relief * 0.12
     dark_layer = np.zeros_like(terrain)
     result = WATER_COLOR * (1 - alpha[:, :, None]) + dark_layer * alpha[:, :, None]
-    result = result * (1 - light_alpha[:, :, None]) + light_overlay * light_alpha[:, :, None]
+    result = (
+        result * (1 - light_alpha[:, :, None]) + light_overlay * light_alpha[:, :, None]
+    )
     return np.clip(result, 0, 255)
 
 
-def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int = HEIGHT, is_canvas: bool = False) -> Image.Image:
+def create_player_layer(
+    snapshot_bytes: bytes,
+    width: int = WIDTH,
+    height: int = HEIGHT,
+    is_canvas: bool = False,
+) -> Image.Image:
     MAIN_WIDTH = 2714
     if is_canvas:
         MAIN_WIDTH = 1357
@@ -160,22 +165,18 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
     vip_size = VIP_WIDTH * height * CHANNELS
 
     if len(snapshot_bytes) < main_size:
-        raise ValueError(
-            f"Неверный размер snapshot: {len(snapshot_bytes)} байт."
-        )
+        raise ValueError(f"Неверный размер snapshot: {len(snapshot_bytes)} байт.")
 
     # ---------- Основной холст ----------
-    main = np.frombuffer(
-        snapshot_bytes[:main_size],
-        dtype=np.uint8
-    ).reshape((height, MAIN_WIDTH, CHANNELS))
+    main = np.frombuffer(snapshot_bytes[:main_size], dtype=np.uint8).reshape(
+        (height, MAIN_WIDTH, CHANNELS)
+    )
 
     # ---------- VIP холст ----------
     vip = None
     if len(snapshot_bytes) >= main_size + vip_size and width > MAIN_WIDTH:
         vip = np.frombuffer(
-            snapshot_bytes[main_size:main_size + vip_size],
-            dtype=np.uint8
+            snapshot_bytes[main_size : main_size + vip_size], dtype=np.uint8
         ).reshape((height, VIP_WIDTH, CHANNELS))
 
     # ---------- Сборка пикселей с точным расчетом разделителя ----------
@@ -183,10 +184,10 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
         separator_width = width - MAIN_WIDTH - VIP_WIDTH
         if separator_width > 0:
             separator = np.zeros((height, separator_width, CHANNELS), dtype=np.uint8)
-            separator[:, :, 0] = 0     # Blue
-            separator[:, :, 1] = 215   # Green
-            separator[:, :, 2] = 255   # Red (Золотая полоса)
-            separator[:, :, 3] = 255   # Alpha
+            separator[:, :, 0] = 0  # Blue
+            separator[:, :, 1] = 215  # Green
+            separator[:, :, 2] = 255  # Red (Золотая полоса)
+            separator[:, :, 3] = 255  # Alpha
             pixels = np.concatenate((main, separator, vip), axis=1)
         else:
             pixels = np.concatenate((main, vip), axis=1)
@@ -197,7 +198,7 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
     r = pixels[:, :, 2]
     g = pixels[:, :, 1]
     b = pixels[:, :, 0]
-    
+
     if width == CANVAS_WIDTH:
         is_not_white = ~((r > 245) & (g > 245) & (b > 245))
         a = np.where(is_not_white, 255, 0).astype(np.uint8)
@@ -213,11 +214,13 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
         return Image.fromarray(rgba, mode="RGBA")
 
 
-def render_region_map(terrain: np.ndarray, snapshot_bytes: bytes, region_key: str = "world") -> bytes:
+def render_region_map(
+    terrain: np.ndarray, snapshot_bytes: bytes, region_key: str = "world"
+) -> bytes:
     world = create_terrain_overlay(terrain)
     player_layer = create_player_layer(snapshot_bytes, WIDTH, HEIGHT)
     world_image = Image.fromarray(world.astype(np.uint8), mode="RGB").convert("RGBA")
-    
+
     # Прямое альфа-наложение слоя игроков на текстуру голубой воды с рельефом
     final_image = Image.alpha_composite(world_image, player_layer).convert("RGB")
 
@@ -237,7 +240,9 @@ def render_region_map(terrain: np.ndarray, snapshot_bytes: bytes, region_key: st
 
 def render_canvas_map(snapshot_bytes: bytes) -> bytes:
     """Рендеринг чистого холста без подложки реалистичной карты"""
-    canvas_image = create_player_layer(snapshot_bytes, CANVAS_WIDTH, CANVAS_HEIGHT, is_canvas=True)
+    canvas_image = create_player_layer(
+        snapshot_bytes, CANVAS_WIDTH, CANVAS_HEIGHT, is_canvas=True
+    )
 
     resized_image = canvas_image.resize(
         (CANVAS_WIDTH * SCALE_FACTOR, CANVAS_HEIGHT * SCALE_FACTOR),
@@ -258,7 +263,9 @@ async def get_map_region_jpeg(region_key: str = "world") -> bytes:
         terrain, snapshot_bytes = await asyncio.gather(terrain_task, snapshot_task)
 
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, render_region_map, terrain, snapshot_bytes, region_key)
+    return await loop.run_in_executor(
+        None, render_region_map, terrain, snapshot_bytes, region_key
+    )
 
 
 async def get_canvas_png() -> bytes:
@@ -274,7 +281,9 @@ async def get_canvas_png() -> bytes:
 # ============================================================
 # ХЕНДЛЕРЫ
 # ============================================================
-@router.message(or_f(Command("maps", "карты"), F.text.lower().in_(["карты", "список карт"])))
+@router.message(
+    or_f(Command("maps", "карты"), F.text.lower().in_(["карты", "список карт"]))
+)
 async def list_maps_handler(message: Message):
     """Показывает список доступных карт"""
     maps_list = "\n".join([f"• {name}" for name in REGION_NAMES.values()])
@@ -287,19 +296,26 @@ async def oi_map_handler(message: Message):
     await message.answer("Нет территорий!")
 
 
-@router.message(or_f(Command("map_anarchy", "anarchy", "анархия"), F.text.lower() == "карта анархия"))
+@router.message(
+    or_f(
+        Command("map_anarchy", "anarchy", "анархия"), F.text.lower() == "карта анархия"
+    )
+)
 async def anarchy_map_handler(message: Message):
     if not os.path.exists(ANARCHY_MAP_PATH):
-        await message.answer("❌ Файл `anarchy.png` не найден на сервере.", parse_mode="Markdown")
+        await message.answer(
+            "❌ Файл `anarchy.png` не найден на сервере.", parse_mode="Markdown"
+        )
         return
-    
+
     photo = FSInputFile(ANARCHY_MAP_PATH)
     await message.answer_photo(
         photo=photo,
         caption="🗺 Карта: **Анархия**",
         parse_mode="Markdown",
-        reply_markup=get_play_button()
+        reply_markup=get_play_button(),
     )
+
 
 @router.message(or_f(Command("canvas", "холст"), F.text.lower() == "холст"))
 async def canvas_map_handler(message: Message):
@@ -308,18 +324,17 @@ async def canvas_map_handler(message: Message):
     try:
         png_data = await get_canvas_png()
         file = BufferedInputFile(png_data, filename="canvas.png")
-        
+
         await status_message.edit_media(
             media=InputMediaPhoto(
-                media=file,
-                caption="🎨 **Холст**",
-                parse_mode="Markdown"
+                media=file, caption="🎨 **Холст**", parse_mode="Markdown"
             ),
-            reply_markup=get_play_button()
+            reply_markup=get_play_button(),
         )
-    except Exception as e:
-        logging.exception("Failed to get canvas")
-        await status_message.edit_text(f"Не удалось получить холст.", parse_mode="Markdown")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Failed to get canvas: {e}")
+        await status_message.edit_text("Не удалось получить холст.")
+
 
 @router.message(
     or_f(
@@ -345,6 +360,9 @@ async def canvas_map_handler(message: Message):
     )
 )
 async def view_map_handler(message: Message):
+    if not message.text:
+        return
+
     text = message.text.lower().strip()
 
     if any(k in text for k in ["са", "северная америка"]):
@@ -389,22 +407,26 @@ async def view_map_handler(message: Message):
         region = "world"
 
     region_title = REGION_NAMES.get(region, "Карта")
-    status_message = await message.answer(f"Рендерю регион: **{region_title}**...", parse_mode="Markdown")
+    status_message = await message.answer(
+        f"Рендерю регион: **{region_title}**...", parse_mode="Markdown"
+    )
     try:
         jpeg_data = await get_map_region_jpeg(region)
         file = BufferedInputFile(jpeg_data, filename=f"{region}.jpg")
-        
+
         await status_message.edit_media(
             media=InputMediaPhoto(
                 media=file,
                 caption=f"🗺 Карта региона: **{region_title}**",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             ),
-            reply_markup=get_play_button()
+            reply_markup=get_play_button(),
         )
-    except Exception as e:
-        logging.exception("Failed to get map")
-        await status_message.edit_text(f"Не удалось получить карту.\n", parse_mode="Markdown")
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"Failed to get map: {e}")
+        await status_message.edit_text("Не удалось получить карту.")
+
+
 # ============================================================
 # НАСТРОЙКА КОМАНД И ЗАПУСК
 # ============================================================
@@ -421,12 +443,19 @@ async def setup_commands(bot: Bot):
 async def main():
     if not BOT_TOKEN:
         raise RuntimeError("Не задана переменная окружения BOT_TOKEN")
-    
-    logging.basicConfig(level=logging.INFO)
+
+    logger.add(
+        "logs/telegram_bot.log",
+        level="DEBUG",
+        format="{time} | {level} | {module}:{function}:{line} | {message}",
+        rotation="100 KB",
+        compression="zip",
+    )
+
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
     dp.include_router(router)
-    
+
     await setup_commands(bot)
     await dp.start_polling(bot)
 
