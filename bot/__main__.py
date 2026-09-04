@@ -156,8 +156,8 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
 
     VIP_WIDTH = 340
 
-    main_size = MAIN_WIDTH * HEIGHT * CHANNELS
-    vip_size = VIP_WIDTH * HEIGHT * CHANNELS
+    main_size = MAIN_WIDTH * height * CHANNELS
+    vip_size = VIP_WIDTH * height * CHANNELS
 
     if len(snapshot_bytes) < main_size:
         raise ValueError(
@@ -168,7 +168,7 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
     main = np.frombuffer(
         snapshot_bytes[:main_size],
         dtype=np.uint8
-    ).reshape((HEIGHT, MAIN_WIDTH, CHANNELS))
+    ).reshape((height, MAIN_WIDTH, CHANNELS))
 
     # ---------- VIP холст ----------
     vip = None
@@ -176,13 +176,13 @@ def create_player_layer(snapshot_bytes: bytes, width: int = WIDTH, height: int =
         vip = np.frombuffer(
             snapshot_bytes[main_size:main_size + vip_size],
             dtype=np.uint8
-        ).reshape((HEIGHT, VIP_WIDTH, CHANNELS))
+        ).reshape((height, VIP_WIDTH, CHANNELS))
 
     # ---------- Сборка пикселей с точным расчетом разделителя ----------
     if vip is not None and width > MAIN_WIDTH:
         separator_width = width - MAIN_WIDTH - VIP_WIDTH
         if separator_width > 0:
-            separator = np.zeros((HEIGHT, separator_width, CHANNELS), dtype=np.uint8)
+            separator = np.zeros((height, separator_width, CHANNELS), dtype=np.uint8)
             separator[:, :, 0] = 0     # Blue
             separator[:, :, 1] = 215   # Green
             separator[:, :, 2] = 255   # Red (Золотая полоса)
