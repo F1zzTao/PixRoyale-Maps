@@ -42,7 +42,7 @@ CANVAS_HEIGHT = 628
 SNAPSHOT_URL = "https://pr.altarus.top/world/snapshot"
 CANVAS_SNAPSHOT_URL = "https://pr.altarus.top/canvas/snapshot"
 TERRAIN_URL = "https://pr.altarus.top/realistic-map.jpg"
-ANARCHY_MAP_PATH = "anarchy.png"
+NEPE_MAP_PATH = "./bot/assets/map_nepe.jpg"
 WATER_COLOR = np.array([91, 155, 213], dtype=np.float32)
 TERRAIN_OPACITY = 0.80
 DARK_RELIEF_OPACITY = 0.50

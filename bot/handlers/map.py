@@ -11,7 +11,7 @@ from aiogram.types import (
 from loguru import logger
 
 from bot.keyboards.play import play_button
-from bot.utils import ANARCHY_MAP_PATH, get_map_region_jpeg
+from bot.utils import NEPE_MAP_PATH, get_map_region_jpeg
 
 router = Router(name="map")
 
@@ -145,20 +145,18 @@ async def oi_map_handler(message: Message):
 
 @router.message(
     or_f(
-        Command("map_anarchy", "anarchy", "анархия"), F.text.lower() == "карта анархия"
+        Command("map_nepe", "nepe", "непе"), F.text.lower() == "карта непе"
     )
 )
-async def anarchy_map_handler(message: Message):
-    if not os.path.exists(ANARCHY_MAP_PATH):
-        await message.answer(
-            "❌ Файл `anarchy.png` не найден на сервере.", parse_mode="Markdown"
-        )
+async def nepe_map_handler(message: Message):
+    if not os.path.exists(NEPE_MAP_PATH):
+        logger.error("Nepe image was not found")
         return
 
-    photo = FSInputFile(ANARCHY_MAP_PATH)
+    photo = FSInputFile(NEPE_MAP_PATH)
     await message.answer_photo(
         photo=photo,
-        caption="🗺 Карта: **Анархия**",
+        caption="🗺 Карта: **Непе**",
         parse_mode="Markdown",
         reply_markup=play_button(),
     )
