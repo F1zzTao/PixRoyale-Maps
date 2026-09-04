@@ -1,0 +1,8 @@
+# ignore all files
+**
+
+# exclusion
+!/bot/
+
+!/pyproject.toml
+!/uv.lock
