@@ -5,28 +5,7 @@ import aiohttp
 import numpy as np
 from PIL import Image
 
-REGIONS = {
-    "world": (0, 0, 2714, 1256),
-    "sa": (0, 0, 1040, 860),
-    "ya": (280, 560, 960, 1256),
-    "eurasia": (760, 0, 2714, 860),
-    "europe": (1030, 40, 1540, 440),
-    "asia": (1440, 40, 2332, 760),
-    "africa": (960, 300, 1720, 1090),
-    "aus": (1860, 700, 2714, 1220),
-    "kishka": (1120, 626, 1150, 700),
-    "canada": (186, 90, 780, 380),
-    "usa": (8, 120, 642, 502),
-    "russia": (1280, 64, 2332, 348),
-    "kazakhstan": (1458, 242, 1776, 364),
-    "shri-lanka": (1784, 640, 1810, 690),
-    "ukraine": (1294, 258, 1436, 330),
-    "bangladesh": (1842, 490, 1892, 544),
-    "china": (1696, 256, 2134, 550),
-    "india": (1666, 408, 1930, 666),
-    "brasil": (502, 670, 860, 1050),
-    "israel": (1390, 414, 1434, 484),
-}
+from bot.core.config import Region
 
 # ============================================================
 # НАСТРОЙКИ КАРТЫ
@@ -157,7 +136,7 @@ def create_player_layer(
 
 
 def render_region_map(
-    terrain: np.ndarray, snapshot_bytes: bytes, region_key: str = "world"
+    terrain: np.ndarray, snapshot_bytes: bytes, region: Region
 ) -> bytes:
     world = create_terrain_overlay(terrain)
     player_layer = create_player_layer(snapshot_bytes, WIDTH, HEIGHT)
@@ -166,7 +145,7 @@ def render_region_map(
     # Прямое альфа-наложение слоя игроков на текстуру голубой воды с рельефом
     final_image = Image.alpha_composite(world_image, player_layer).convert("RGB")
 
-    x_min, y_min, x_max, y_max = REGIONS.get(region_key, REGIONS["world"])
+    x_min, y_min, x_max, y_max = region.coords
     cropped_image = final_image.crop((x_min, y_min, x_max, y_max))
 
     crop_w, crop_h = cropped_image.size
@@ -196,7 +175,7 @@ def render_canvas_map(snapshot_bytes: bytes) -> bytes:
     return output.getvalue()
 
 
-async def get_map_region_jpeg(region_key: str = "world") -> bytes:
+async def get_map_region_jpeg(region: Region) -> bytes:
     timeout = aiohttp.ClientTimeout(total=30)
     headers = {"User-Agent": "Mozilla/5.0"}
     async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
@@ -206,7 +185,7 @@ async def get_map_region_jpeg(region_key: str = "world") -> bytes:
 
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
-        None, render_region_map, terrain, snapshot_bytes, region_key
+        None, render_region_map, terrain, snapshot_bytes, region
     )
 
 
