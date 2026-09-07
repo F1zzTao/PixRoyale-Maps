@@ -114,6 +114,22 @@ async def view_map_handler(message: Message):
         region = "brasil"
     elif "израил" in text:
         region = "israel"
+    elif "ои" in text:
+        await message.answer("Нет территорий!")
+        return
+    elif "непе" in text:
+        if not os.path.exists(NEPE_MAP_PATH):
+            logger.error("Nepe image was not found")
+            return
+
+        photo = FSInputFile(NEPE_MAP_PATH)
+        await message.answer_photo(
+            photo=photo,
+            caption="🗺 Карта: **Непе**",
+            parse_mode="Markdown",
+            reply_markup=play_button(),
+        )
+        return
     else:
         region = "world"
 
@@ -136,27 +152,3 @@ async def view_map_handler(message: Message):
     except Exception as e:  # noqa: BLE001
         logger.exception(f"Failed to get map: {e}")
         await status_message.edit_text("Не удалось получить карту.")
-
-
-@router.message(or_f(Command("map_oi", "oi", "ои"), F.text.lower() == "карта ои"))
-async def oi_map_handler(message: Message):
-    await message.answer("Нет территорий!")
-
-
-@router.message(
-    or_f(
-        Command("map_nepe", "nepe", "непе"), F.text.lower() == "карта непе"
-    )
-)
-async def nepe_map_handler(message: Message):
-    if not os.path.exists(NEPE_MAP_PATH):
-        logger.error("Nepe image was not found")
-        return
-
-    photo = FSInputFile(NEPE_MAP_PATH)
-    await message.answer_photo(
-        photo=photo,
-        caption="🗺 Карта: **Непе**",
-        parse_mode="Markdown",
-        reply_markup=play_button(),
-    )
