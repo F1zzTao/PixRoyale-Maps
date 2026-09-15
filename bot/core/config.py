@@ -93,7 +93,7 @@ REGIONS = {
     "kazakhstan": Region(
         "Казахстан",
         (1458, 242, 1776, 364),
-        aliases=("россия", "рф", "рашка", "russia"),
+        aliases=("рк",),
     ),
     "shri-lanka": Region(
         "Шри-Ланка",
