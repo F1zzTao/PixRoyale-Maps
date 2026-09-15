@@ -1,4 +1,26 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DIR = Path(__file__).absolute().parent.parent.parent
+BOT_DIR = Path(__file__).absolute().parent.parent
+
+class EnvBaseSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=f"{DIR}/.env", env_file_encoding="utf-8", extra="ignore")
+
+
+class BotSettings(EnvBaseSettings):
+    BOT_TOKEN: str
+
+
+class Settings(BotSettings):
+    DEBUG: bool = False
+
+
+settings = Settings()
 
 
 @dataclass(frozen=True)
