@@ -10,9 +10,9 @@ from aiogram.types import (
 )
 from loguru import logger
 
-from bot.core.config import REGION_ALIASES, REGIONS
+from bot.core.config import settings
 from bot.keyboards.play import play_button
-from bot.utils import NEPE_MAP_PATH, get_map_region_jpeg
+from bot.utils import get_map_region_jpeg
 
 router = Router(name="map")
 
@@ -29,7 +29,7 @@ def find_region(text: str, aliases: dict) -> str | None:
 )
 async def list_maps_handler(message: Message):
     """Показывает список доступных карт"""
-    maps_list = "\n".join([f"• {region.name}" for region in REGIONS.values()])
+    maps_list = "\n".join([f"• {region.name}" for region in settings.REGIONS.values()])
     text = f"🗺 **Доступные карты:**\n{maps_list}\n\n🎨 **Холст** (`/canvas`)"
     await message.answer(text, parse_mode="Markdown")
 
@@ -53,11 +53,11 @@ async def view_map_handler(message: Message, command: CommandObject | None = Non
         await message.answer("Нет территорий!")
         return
     elif "непе" in text:
-        if not os.path.exists(NEPE_MAP_PATH):
+        if not os.path.exists(settings.NEPE_MAP_PATH):
             logger.error("Nepe image was not found")
             return
 
-        photo = FSInputFile(NEPE_MAP_PATH)
+        photo = FSInputFile(settings.NEPE_MAP_PATH)
         await message.answer_photo(
             photo=photo,
             caption="🗺 Карта: **Непе**",
@@ -66,8 +66,8 @@ async def view_map_handler(message: Message, command: CommandObject | None = Non
         )
         return
 
-    region_key_name = find_region(text, REGION_ALIASES) or "world"
-    region = REGIONS.get(region_key_name)
+    region_key_name = find_region(text, settings.REGION_ALIASES) or "world"
+    region = settings.REGIONS.get(region_key_name)
     if not region:
         logger.error(f'Fallback region "{region_key_name}" was not found')
         await message.answer("Не удалось получить карту.")

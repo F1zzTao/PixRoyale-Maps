@@ -5,27 +5,7 @@ import aiohttp
 import numpy as np
 from PIL import Image
 
-from bot.core.config import Region
-
-# ============================================================
-# НАСТРОЙКИ КАРТЫ
-# ============================================================
-WIDTH = 2714
-HEIGHT = 1256
-CHANNELS = 4
-
-# Размеры холста
-CANVAS_WIDTH = 1701  # 1357 + 4 + 340
-CANVAS_HEIGHT = 628
-
-SNAPSHOT_URL = "https://pr.altarus.top/world/snapshot"
-CANVAS_SNAPSHOT_URL = "https://pr.altarus.top/canvas/snapshot"
-TERRAIN_URL = "https://pr.altarus.top/realistic-map.jpg"
-NEPE_MAP_PATH = "./bot/assets/map_nepe.jpg"
-WATER_COLOR = np.array([91, 155, 213], dtype=np.float32)
-TERRAIN_OPACITY = 0.80
-DARK_RELIEF_OPACITY = 0.50
-SCALE_FACTOR = 2
+from bot.core.config import Region, settings
 
 
 # ============================================================
@@ -38,10 +18,10 @@ async def fetch_bytes(session: aiohttp.ClientSession, url: str) -> bytes:
 
 
 async def load_terrain(session: aiohttp.ClientSession) -> np.ndarray:
-    terrain_bytes = await fetch_bytes(session, TERRAIN_URL)
+    terrain_bytes = await fetch_bytes(session, settings.TERRAIN_URL)
     terrain_image = Image.open(io.BytesIO(terrain_bytes)).convert("RGB")
-    if terrain_image.size != (WIDTH, HEIGHT):
-        terrain_image = terrain_image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    if terrain_image.size != (settings.WIDTH, settings.HEIGHT):
+        terrain_image = terrain_image.resize((settings.WIDTH, settings.HEIGHT), Image.Resampling.LANCZOS)
     return np.array(terrain_image).astype(np.float32)
 
 
@@ -58,12 +38,12 @@ def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
     light = np.clip((brightness - 150) / 105, 0, 1)
     shadow = np.clip((130 - brightness) / 130, 0, 1)
     relief = np.clip(relief_strength * 2.0, 0, 1)
-    alpha = relief * TERRAIN_OPACITY + shadow * DARK_RELIEF_OPACITY * relief
+    alpha = relief * settings.TERRAIN_OPACITY + shadow * settings.DARK_RELIEF_OPACITY * relief
     alpha = np.clip(alpha, 0, 0.75)
     light_overlay = np.ones_like(terrain) * 255.0
     light_alpha = light * relief * 0.12
     dark_layer = np.zeros_like(terrain)
-    result = WATER_COLOR * (1 - alpha[:, :, None]) + dark_layer * alpha[:, :, None]
+    result = settings.WATER_COLOR * (1 - alpha[:, :, None]) + dark_layer * alpha[:, :, None]
     result = (
         result * (1 - light_alpha[:, :, None]) + light_overlay * light_alpha[:, :, None]
     )
@@ -72,8 +52,8 @@ def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
 
 def create_player_layer(
     snapshot_bytes: bytes,
-    width: int = WIDTH,
-    height: int = HEIGHT,
+    width: int = settings.WIDTH,
+    height: int = settings.HEIGHT,
     is_canvas: bool = False,
 ) -> Image.Image:
     MAIN_WIDTH = 2714
@@ -82,15 +62,15 @@ def create_player_layer(
 
     VIP_WIDTH = 340
 
-    main_size = MAIN_WIDTH * height * CHANNELS
-    vip_size = VIP_WIDTH * height * CHANNELS
+    main_size = MAIN_WIDTH * height * settings.CHANNELS
+    vip_size = VIP_WIDTH * height * settings.CHANNELS
 
     if len(snapshot_bytes) < main_size:
         raise ValueError(f"Неверный размер snapshot: {len(snapshot_bytes)} байт.")
 
     # ---------- Основной холст ----------
     main = np.frombuffer(snapshot_bytes[:main_size], dtype=np.uint8).reshape(
-        (height, MAIN_WIDTH, CHANNELS)
+        (height, MAIN_WIDTH, settings.CHANNELS)
     )
 
     # ---------- VIP холст ----------
@@ -98,13 +78,13 @@ def create_player_layer(
     if len(snapshot_bytes) >= main_size + vip_size and width > MAIN_WIDTH:
         vip = np.frombuffer(
             snapshot_bytes[main_size : main_size + vip_size], dtype=np.uint8
-        ).reshape((height, VIP_WIDTH, CHANNELS))
+        ).reshape((height, VIP_WIDTH, settings.CHANNELS))
 
     # ---------- Сборка пикселей с точным расчетом разделителя ----------
     if vip is not None and width > MAIN_WIDTH:
         separator_width = width - MAIN_WIDTH - VIP_WIDTH
         if separator_width > 0:
-            separator = np.zeros((height, separator_width, CHANNELS), dtype=np.uint8)
+            separator = np.zeros((height, separator_width, settings.CHANNELS), dtype=np.uint8)
             separator[:, :, 0] = 0  # Blue
             separator[:, :, 1] = 215  # Green
             separator[:, :, 2] = 255  # Red (Золотая полоса)
@@ -120,7 +100,7 @@ def create_player_layer(
     g = pixels[:, :, 1]
     b = pixels[:, :, 0]
 
-    if width == CANVAS_WIDTH:
+    if width == settings.CANVAS_WIDTH:
         is_not_white = ~((r > 245) & (g > 245) & (b > 245))
         a = np.where(is_not_white, 255, 0).astype(np.uint8)
         rgba_array = np.dstack((r, g, b, a))
@@ -139,7 +119,7 @@ def render_region_map(
     terrain: np.ndarray, snapshot_bytes: bytes, region: Region
 ) -> bytes:
     world = create_terrain_overlay(terrain)
-    player_layer = create_player_layer(snapshot_bytes, WIDTH, HEIGHT)
+    player_layer = create_player_layer(snapshot_bytes, settings.WIDTH, settings.HEIGHT)
     world_image = Image.fromarray(world.astype(np.uint8), mode="RGB").convert("RGBA")
 
     # Прямое альфа-наложение слоя игроков на текстуру голубой воды с рельефом
@@ -150,7 +130,7 @@ def render_region_map(
 
     crop_w, crop_h = cropped_image.size
     resized_image = cropped_image.resize(
-        (crop_w * SCALE_FACTOR, crop_h * SCALE_FACTOR),
+        (crop_w * settings.SCALE_FACTOR, crop_h * settings.SCALE_FACTOR),
         Image.Resampling.NEAREST,
     )
 
@@ -162,11 +142,11 @@ def render_region_map(
 def render_canvas_map(snapshot_bytes: bytes) -> bytes:
     """Рендеринг чистого холста без подложки реалистичной карты"""
     canvas_image = create_player_layer(
-        snapshot_bytes, CANVAS_WIDTH, CANVAS_HEIGHT, is_canvas=True
+        snapshot_bytes, settings.CANVAS_WIDTH, settings.CANVAS_HEIGHT, is_canvas=True
     )
 
     resized_image = canvas_image.resize(
-        (CANVAS_WIDTH * SCALE_FACTOR, CANVAS_HEIGHT * SCALE_FACTOR),
+        (settings.CANVAS_WIDTH * settings.SCALE_FACTOR, settings.CANVAS_HEIGHT * settings.SCALE_FACTOR),
         Image.Resampling.NEAREST,
     )
 
@@ -180,7 +160,7 @@ async def get_map_region_jpeg(region: Region) -> bytes:
     headers = {"User-Agent": "Mozilla/5.0"}
     async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
         terrain_task = load_terrain(session)
-        snapshot_task = fetch_bytes(session, SNAPSHOT_URL)
+        snapshot_task = fetch_bytes(session, settings.SNAPSHOT_URL)
         terrain, snapshot_bytes = await asyncio.gather(terrain_task, snapshot_task)
 
     loop = asyncio.get_running_loop()
@@ -193,7 +173,7 @@ async def get_canvas_png() -> bytes:
     timeout = aiohttp.ClientTimeout(total=30)
     headers = {"User-Agent": "Mozilla/5.0"}
     async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-        snapshot_bytes = await fetch_bytes(session, CANVAS_SNAPSHOT_URL)
+        snapshot_bytes = await fetch_bytes(session, settings.CANVAS_SNAPSHOT_URL)
 
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, render_canvas_map, snapshot_bytes)
