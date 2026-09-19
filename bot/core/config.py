@@ -52,6 +52,11 @@ class GameSettings(EnvBaseSettings):
             (1030, 40, 1540, 440),
             aliases=(),
         ),
+        "baltics": Region(
+            "Балтия",
+            (1276, 197, 1340, 255),
+            aliases=("прибалтика", "латвия", "литва", "эстония"),
+        ),
         "asia": Region(
             "Азия",
             (1440, 40, 2332, 760),
@@ -74,12 +79,12 @@ class GameSettings(EnvBaseSettings):
         ),
         "canada": Region(
             "Канада",
-            (186, 90, 780, 380),
+            (190, 20, 848, 360),
             aliases=(),
         ),
         "usa": Region(
             "США",
-            (8, 120, 642, 502),
+            (0, 100, 645, 510),
             aliases=("штаты",),
         ),
         "russia": Region(
@@ -99,7 +104,7 @@ class GameSettings(EnvBaseSettings):
         ),
         "ukraine": Region(
             "Украина",
-            (1294, 258, 1436, 330),
+            (1296, 258, 1436, 334),
             aliases=("укр",),
         ),
         "bangladesh": Region(
@@ -142,6 +147,11 @@ class GameSettings(EnvBaseSettings):
     CANVAS_WIDTH: int = 1701  # 1357 + 4 + 340
     CANVAS_HEIGHT: int = 628
 
+    # Snapshot layout (widths of the main and VIP drawing areas)
+    MAIN_MAP_WIDTH: int = 2714
+    CANVAS_MAIN_WIDTH: int = 1357
+    VIP_WIDTH: int = 340
+
     SNAPSHOT_URL: str = "https://pr.altarus.top/world/snapshot"
     CANVAS_SNAPSHOT_URL: str = "https://pr.altarus.top/canvas/snapshot"
     TERRAIN_URL: str = "https://pr.altarus.top/realistic-map.jpg"
@@ -150,9 +160,8 @@ class GameSettings(EnvBaseSettings):
     NEPE_MAP_PATH: str = "./bot/assets/map_nepe.jpg"
 
     # Map settings
-    WATER_COLOR: NDArray = np.array([91, 155, 213], dtype=np.float32)
+    WATER_COLOR: NDArray = np.array([90, 150, 220], dtype=np.float32)
     TERRAIN_OPACITY: float = 0.80
-    DARK_RELIEF_OPACITY: float = 0.50
 
     SCALE_FACTOR: int = 2
 
