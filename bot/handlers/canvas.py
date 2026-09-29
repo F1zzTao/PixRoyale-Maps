@@ -15,6 +15,10 @@ router = Router(name="canvas")
 @router.message(or_f(Command("canvas", "холст"), F.text.lower() == "холст"))
 async def canvas_map_handler(message: Message):
     """Хендлер для отображения холста"""
+    # TODO: Broken.
+    await message.answer("Холст пока не доступен, может вернется в будущем.")
+
+    """
     status_message = await message.answer("Рендерю **Холст**...", parse_mode="Markdown")
     try:
         png_data = await get_canvas_png()
@@ -29,3 +33,4 @@ async def canvas_map_handler(message: Message):
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to get canvas: {e}")
         await status_message.edit_text("Не удалось получить холст.")
+    """

@@ -29,7 +29,7 @@ class GameSettings(EnvBaseSettings):
     REGIONS: dict = {
         "world": Region(
             "Весь мир",
-            (0, 0, 2714, 1256),
+            (0, 0, 1357, 628),
             aliases=("мир",),
         ),
         "sa": Region(
@@ -140,21 +140,21 @@ class GameSettings(EnvBaseSettings):
     }
 
     # Map
-    WIDTH: int = 2714
-    HEIGHT: int = 1256
+    WIDTH: int = 1357
+    HEIGHT: int = 628
     CHANNELS: int = 4
 
     CANVAS_WIDTH: int = 1701  # 1357 + 4 + 340
     CANVAS_HEIGHT: int = 628
 
     # Snapshot layout (widths of the main and VIP drawing areas)
-    MAIN_MAP_WIDTH: int = 2714
+    MAIN_MAP_WIDTH: int = 1357
     CANVAS_MAIN_WIDTH: int = 1357
     VIP_WIDTH: int = 340
 
     SNAPSHOT_URL: str = "https://pr.altarus.top/world/snapshot"
     CANVAS_SNAPSHOT_URL: str = "https://pr.altarus.top/canvas/snapshot"
-    TERRAIN_URL: str = "https://pr.altarus.top/realistic-map.jpg"
+    TERRAIN_URL: str = "https://pr.pixroyale.fun/world/asset/europe/realistic-map.jpg"
 
     # Easter egg
     NEPE_MAP_PATH: str = "./bot/assets/map_nepe.jpg"
