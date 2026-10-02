@@ -41,6 +41,11 @@ async def view_map_handler(message: Message, command: CommandObject | None = Non
     if not message.text:
         return
 
+    if message.from_user:
+        if message.from_user.id in (8357247109, 924062319):
+            await message.answer("пошел нахуй")
+            return
+
     if command and command.args:
         text = command.args
     else:
