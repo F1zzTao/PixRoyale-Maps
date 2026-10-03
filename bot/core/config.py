@@ -152,8 +152,8 @@ class GameSettings(EnvBaseSettings):
     CANVAS_MAIN_WIDTH: int = 1357
     VIP_WIDTH: int = 340
 
-    SNAPSHOT_URL: str = "https://pr.altarus.top/world/snapshot"
-    CANVAS_SNAPSHOT_URL: str = "https://pr.altarus.top/canvas/snapshot"
+    SNAPSHOT_URL: str = "https://pr.pixroyale.fun/world/snapshot?revision=0&v=map-0"
+    CANVAS_SNAPSHOT_URL: str = "https://pr.pixroyale.fun/canvas/snapshot"
     TERRAIN_URL: str = "https://pr.pixroyale.fun/world/asset/europe/realistic-map.jpg"
 
     # Easter egg
