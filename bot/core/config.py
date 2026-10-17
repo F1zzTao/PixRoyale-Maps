@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+if TYPE_CHECKING:
+    from sqlalchemy.engine.url import URL
+
 DIR = Path(__file__).absolute().parent.parent.parent
 BOT_DIR = Path(__file__).absolute().parent.parent
+
 
 class EnvBaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=f"{DIR}/.env", env_file_encoding="utf-8", extra="ignore")
@@ -16,6 +21,14 @@ class EnvBaseSettings(BaseSettings):
 
 class BotSettings(EnvBaseSettings):
     BOT_TOKEN: str
+
+
+class DBSettings(EnvBaseSettings):
+    DB_PATH: str = "db.db"
+
+    @property
+    def database_url(self) -> URL | str:
+        return f"sqlite+aiosqlite:///{self.DB_PATH}"
 
 
 @dataclass(frozen=True)
@@ -166,7 +179,7 @@ class GameSettings(EnvBaseSettings):
     SCALE_FACTOR: int = 2
 
 
-class Settings(BotSettings, GameSettings):
+class Settings(BotSettings, DBSettings, GameSettings):
     DEBUG: bool = False
 
 

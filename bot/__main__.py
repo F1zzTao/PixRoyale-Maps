@@ -6,11 +6,14 @@ from loguru import logger
 from bot.core.loader import bot, dp
 from bot.handlers import get_handlers_router
 from bot.keyboards.default_commands import remove_default_commands, set_default_commands
+from bot.middlewares import register_middlewares
 
 router = Router()
 
 async def on_startup() -> None:
     logger.info("Bot starting...")
+
+    register_middlewares(dp)
 
     dp.include_router(get_handlers_router())
 
