@@ -71,9 +71,7 @@ async def view_map_handler(message: Message, command: CommandObject | None = Non
         )
         return
 
-    # TODO: This is a workaround; region system is borked rn
-    # region_key_name = find_region(text, settings.REGION_ALIASES) or "world"
-    region_key_name = "world"
+    region_key_name = find_region(text, settings.REGION_ALIASES) or "world"
     region = settings.REGIONS.get(region_key_name)
     if not region:
         logger.error(f'Fallback region "{region_key_name}" was not found')
