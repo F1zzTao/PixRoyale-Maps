@@ -10,19 +10,11 @@ services:
     env_file:
       - .env
 
-    develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
-      watch:
-        # Sync the working directory with the `/app` directory in the container
-        - action: sync
-          path: .
-          target: /usr/src/app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
-          ignore:
-            - .venv/
+    volumes:
+      - .:/usr/src/app
+      - bot-venv:/usr/src/app/.venv
 
-        # Rebuild the image if dependencies change by checking uv.lock
-        - action: rebuild
-          path: ./uv.lock
+    working_dir: /usr/src/app
+
+volumes:
+  bot-venv:

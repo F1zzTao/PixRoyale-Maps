@@ -2,7 +2,8 @@ FROM ghcr.io/astral-sh/uv:0.5-python3.13-alpine
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PATH="/usr/src/app/.venv/bin:$PATH"
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /usr/src/app
 
@@ -11,7 +12,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --group bot --no-group admin --no-group dev \
     && adduser -D appuser \
-    && chown -R appuser:appuser .
+    && chown -R appuser:appuser /usr/src/app /opt/venv
 
 USER appuser
 
