@@ -12,16 +12,19 @@ users_commands: dict[str, dict[str, str]] = {
         "maps": "Full map list",
         "canvas": "Canvas",
         "view_map": "World map",
+        "game": "Game link",
     },
     "uk": {
         "maps": "Full map list",
         "canvas": "Canvas",
         "view_map": "World map",
+        "game": "Game link",
     },
     "ru": {
         "maps": "Список всех доступных карт",
         "canvas": "Холст",
         "view_map": "Вся карта мира",
+        "game": "Ссылка на игру",
     },
 }
 

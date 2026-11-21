@@ -134,3 +134,15 @@ async def view_map_handler(message: Message, command: CommandObject | None = Non
     except Exception as e:  # noqa: BLE001
         logger.exception(f"Failed to get map: {e}")
         await status_message.edit_text("Не удалось получить карту.")
+
+
+@router.message(
+    or_f(
+        Command("play", "game", "игра", "ссылка", "link"),
+        F.text.lower().in_(["игра", "играть", "play", "game", "ссылка", "link"]),
+    )
+)
+async def play_handler(message: Message):
+    """Показывает кнопку для запуска игры"""
+    await message.answer("Игра:", reply_markup=play_button())
+
