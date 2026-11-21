@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 
 from bot.core.config import Region, settings
+from bot.services.map_meta import MapMeta, get_map_meta, invalidate_map_meta_cache
 
 # ============================================================
 # CONSTANTS
@@ -41,6 +42,12 @@ HTTP_TIMEOUT: int = 30
 USER_AGENT: str = "Mozilla/5.0"
 
 
+# Terrain overlay cache (keyed by terrain_url, width, height)
+_cached_overlay_key: tuple[str, int, int] | None = None
+_cached_overlay: np.ndarray | None = None
+_overlay_lock = asyncio.Lock()
+
+
 # ============================================================
 # ASYNC RESOURCE LOADING
 # ============================================================
@@ -51,15 +58,44 @@ async def fetch_bytes(session: aiohttp.ClientSession, url: str) -> bytes:
         return await response.read()
 
 
-async def load_terrain(session: aiohttp.ClientSession) -> np.ndarray:
+async def load_terrain(
+    session: aiohttp.ClientSession,
+    terrain_url: str,
+    width: int,
+    height: int,
+) -> np.ndarray:
     """Fetch the terrain base-map and return it as a float32 RGB array."""
-    terrain_bytes = await fetch_bytes(session, settings.TERRAIN_URL)
+    terrain_bytes = await fetch_bytes(session, terrain_url)
     terrain_image = Image.open(io.BytesIO(terrain_bytes)).convert("RGB")
-    if terrain_image.size != (settings.WIDTH, settings.HEIGHT):
+    if terrain_image.size != (width, height):
         terrain_image = terrain_image.resize(
-            (settings.WIDTH, settings.HEIGHT), Image.Resampling.LANCZOS,
+            (width, height), Image.Resampling.LANCZOS,
         )
     return np.array(terrain_image).astype(np.float32)
+
+
+async def get_cached_terrain_overlay(
+    session: aiohttp.ClientSession,
+    meta: MapMeta,
+) -> np.ndarray:
+    """Fetch and precompute the shaded-relief terrain overlay, cached by URL and size."""
+    global _cached_overlay_key, _cached_overlay
+
+    key = (meta.terrain_url, meta.width, meta.height)
+    if _cached_overlay_key == key and _cached_overlay is not None:
+        return _cached_overlay
+
+    async with _overlay_lock:
+        if _cached_overlay_key == key and _cached_overlay is not None:
+            return _cached_overlay
+
+        terrain = await load_terrain(session, meta.terrain_url, meta.width, meta.height)
+        loop = asyncio.get_running_loop()
+        overlay = await loop.run_in_executor(None, create_terrain_overlay, terrain)
+        overlay_u8 = overlay.astype(np.uint8)
+        _cached_overlay = overlay_u8
+        _cached_overlay_key = key
+        return overlay_u8
 
 
 # ============================================================
@@ -136,8 +172,8 @@ def create_terrain_overlay(terrain: np.ndarray) -> np.ndarray:
 
 def create_player_layer(
     snapshot_bytes: bytes,
-    width: int = settings.WIDTH,
-    height: int = settings.HEIGHT,
+    width: int,
+    height: int,
     is_canvas: bool = False,
 ) -> Image.Image:
     """
@@ -150,21 +186,21 @@ def create_player_layer(
     """
     if is_canvas:
         expected_min_size = settings.CANVAS_MAIN_WIDTH * height * settings.CHANNELS
-    else:
-        expected_min_size = width * height * settings.CHANNELS
-
-    if len(snapshot_bytes) < expected_min_size:
-        raise ValueError(
-            f"Invalid snapshot size: {len(snapshot_bytes)} bytes "
-            f"(expected at least {expected_min_size}).",
-        )
-
-    # Choose widths according to mode
-    if is_canvas:
+        if len(snapshot_bytes) < expected_min_size:
+            raise ValueError(
+                f"Invalid snapshot size: {len(snapshot_bytes)} bytes "
+                f"(expected at least {expected_min_size}).",
+            )
         main_width = settings.CANVAS_MAIN_WIDTH   # 1357
         vip_width = settings.VIP_WIDTH             # 340
     else:
-        main_width = settings.MAIN_MAP_WIDTH       # 2714
+        expected_size = width * height * settings.CHANNELS
+        if len(snapshot_bytes) != expected_size:
+            raise ValueError(
+                f"Invalid snapshot size: {len(snapshot_bytes)} bytes "
+                f"(expected {expected_size} for {width}x{height}).",
+            )
+        main_width = width
         vip_width = 0
 
     main = _decode_main_area(snapshot_bytes, height, main_width)
@@ -270,16 +306,22 @@ def _scale_and_encode(
 
 
 def render_region_map(
-    terrain: np.ndarray, snapshot_bytes: bytes, region: Region,
+    terrain_overlay: np.ndarray,
+    snapshot_bytes: bytes,
+    meta: MapMeta,
+    region: Region,
 ) -> bytes:
     """Composite player layer over the terrain overlay, crop to *region*, JPEG."""
-    world = create_terrain_overlay(terrain)
-    player_layer = create_player_layer(snapshot_bytes, settings.WIDTH, settings.HEIGHT)
-    world_image = Image.fromarray(world.astype(np.uint8), mode="RGB").convert("RGBA")
+    player_layer = create_player_layer(snapshot_bytes, meta.width, meta.height)
+    world_image = Image.fromarray(terrain_overlay.astype(np.uint8), mode="RGB").convert("RGBA")
 
     composite = Image.alpha_composite(world_image, player_layer).convert("RGB")
 
     x_min, y_min, x_max, y_max = region.coords
+    x_min = max(0, min(x_min, meta.width))
+    y_min = max(0, min(y_min, meta.height))
+    x_max = max(x_min + 1, min(x_max, meta.width))
+    y_max = max(y_min + 1, min(y_max, meta.height))
     cropped = composite.crop((x_min, y_min, x_max, y_max))
 
     return _scale_and_encode(
@@ -306,18 +348,43 @@ async def _create_session() -> aiohttp.ClientSession:
     return aiohttp.ClientSession(timeout=timeout, headers=headers)
 
 
-async def get_map_region_jpeg(region: Region) -> bytes:
-    """Concurrently fetch terrain + snapshot, render region, return JPEG bytes."""
+async def get_map_region_jpeg(region: Region, meta: MapMeta | None = None) -> bytes:
+    """Concurrently fetch terrain overlay + snapshot, render region, return JPEG bytes."""
+    loop = asyncio.get_running_loop()
     session = await _create_session()
     async with session:
-        terrain_task = load_terrain(session)
+        active_meta = meta or await get_map_meta(session)
+        overlay_task = get_cached_terrain_overlay(session, active_meta)
         snapshot_task = fetch_bytes(session, settings.SNAPSHOT_URL)
-        terrain, snapshot_bytes = await asyncio.gather(terrain_task, snapshot_task)
+        terrain_overlay, snapshot_bytes = await asyncio.gather(overlay_task, snapshot_task)
 
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        None, render_region_map, terrain, snapshot_bytes, region,
-    )
+        try:
+            return await loop.run_in_executor(
+                None, render_region_map, terrain_overlay, snapshot_bytes, active_meta, region,
+            )
+        except ValueError:
+            invalidate_map_meta_cache()
+            refreshed_meta = await get_map_meta(session, force_refresh=True)
+            if (
+                refreshed_meta.width == active_meta.width
+                and refreshed_meta.height == active_meta.height
+            ):
+                raise
+
+            if (
+                refreshed_meta.map_id != "world"
+                or region.coords == (0, 0, active_meta.width, active_meta.height)
+            ):
+                region_name = (
+                    "Весь мир" if refreshed_meta.map_id == "world" else refreshed_meta.name_ru
+                )
+                region = Region(region_name, (0, 0, refreshed_meta.width, refreshed_meta.height))
+
+            terrain_overlay = await get_cached_terrain_overlay(session, refreshed_meta)
+            snapshot_bytes = await fetch_bytes(session, settings.SNAPSHOT_URL)
+            return await loop.run_in_executor(
+                None, render_region_map, terrain_overlay, snapshot_bytes, refreshed_meta, region,
+            )
 
 
 async def get_canvas_png() -> bytes:
